@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  lab:
+    build:
+      context: .
+      dockerfile: Dockerfile.debian
+    image: jupyterlab-debian:latest
+    container_name: jupyterlab-debian
+    ports:
+      - "127.0.0.1:8000:8888"
+    volumes:
+      - ./notebook:/home/jovyan/work
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+      # (opcional) se quiser forçar UID/GID diferentes do padrão:
+      # - NB_UID=1000
+      # - NB_GID=1000

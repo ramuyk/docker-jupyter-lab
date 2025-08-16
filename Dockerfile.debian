@@ -1,0 +1,84 @@
+FROM debian:12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG NB_USER=jovyan
+ARG NB_UID=1000
+ARG NB_GID=1000
+
+# SO + ferramentas mínimas
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl bash git vim tmux tini gosu \
+    python3 python3-venv python3-pip python3-dev \
+    gcc g++ make \
+    openjdk-17-jdk-headless \
+    libpq-dev postgresql-client \
+    golang-go \
+ && rm -rf /var/lib/apt/lists/*
+
+# Node LTS para tslab
+RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+ && apt-get update && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/*
+
+# Usuário jovyan (UID/GID=1000:1000)
+RUN groupadd -g ${NB_GID} ${NB_USER} \
+ && useradd -m -s /bin/bash -u ${NB_UID} -g ${NB_GID} ${NB_USER} \
+ && mkdir -p /home/${NB_USER}/work \
+ && chown -R ${NB_UID}:${NB_GID} /home/${NB_USER}
+
+WORKDIR /home/${NB_USER}/work
+
+# Python em venv (foge do PEP 668 sem quebrar sistema)
+RUN python3 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+
+# JupyterLab + kernels Python-side
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
+    pip install --no-cache-dir \
+      jupyterlab jupyter-console jupyter_client \
+      bash_kernel kotlin-jupyter-kernel \
+      tabulate psycopg2-binary \
+      jupyterlab_execute_time
+
+# >>>>>>> BLOCO NOVO: symlinks para o binário do Jupyter ficar no PATH global <<<<<<<
+RUN ln -sf /opt/venv/bin/jupyter         /usr/local/bin/jupyter      && \
+    ln -sf /opt/venv/bin/jupyter-lab     /usr/local/bin/jupyter-lab  && \
+    ln -sf /opt/venv/bin/jupyter-console /usr/local/bin/jupyter-console
+# >>>>>>> FIM DO BLOCO NOVO <<<<<<<
+
+# Registrar kernels (no sys-prefix do venv)
+RUN python -m bash_kernel.install --sys-prefix && \
+    python -m kotlin_kernel add-kernel && \
+    pip install --no-cache-dir --no-build-isolation --no-deps postgres_kernel && \
+    python -m postgres_kernel install --sys-prefix
+
+# JS/TS via tslab (global)
+RUN npm install -g tslab && \
+    JUPYTER_DATA_DIR=/usr/local/share/jupyter tslab install --python=/opt/venv/bin/python
+
+# Go (gophernotes) — binário global + kernelspec global
+ENV GOBIN=/usr/local/bin
+RUN go install github.com/gopherdata/gophernotes@latest && \
+    test -x /usr/local/bin/gophernotes && \
+    mkdir -p /usr/local/share/jupyter/kernels/gophernotes && \
+    printf '{\n  "argv": ["/usr/local/bin/gophernotes", "{connection_file}"],\n  "display_name": "Go (gophernotes)",\n  "language": "go",\n  "codemirror_mode": "go"\n}\n' \
+      > /usr/local/share/jupyter/kernels/gophernotes/kernel.json
+
+# Tema escuro padrão para o usuário
+RUN mkdir -p /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+    printf '{ "theme": "JupyterLab Dark" }\n' \
+      > /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
+    chown -R ${NB_UID}:${NB_GID} /home/${NB_USER}/.jupyter
+
+# (opcional) seu vimrc
+# COPY conf/vimrc /etc/vim/vimrc
+
+# Script de start: corrige permissões do bind mount e troca para jovyan
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/start.sh
+
+# Rodamos como root para poder consertar permissões e depois dar drop
+ENV SHELL=/bin/bash
+ENTRYPOINT ["/usr/bin/tini","-g","--","/usr/local/bin/start.sh"]
+CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--no-browser","--ServerApp.token=","--ServerApp.password="]
+

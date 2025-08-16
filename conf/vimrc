@@ -1,0 +1,359 @@
+"* config-basics
+runtime! debian.vim
+if has("syntax")
+  syntax on
+endif
+
+autocmd BufReadPost *
+     \ if line("'\"") > 0 && line("'\"") <= line("$") |
+     \   exe "normal! g`\"" |
+     \ endif
+
+set showmatch		" Show matching brackets.
+
+if filereadable("/etc/vim/vimrc.local")
+  source /etc/vim/vimrc.local
+endif
+
+set belloff=all
+set nocompatible " Use Vim settings, rather than Vi settings
+set softtabstop=4 " Indent by 2 spaces when hitting tab
+set shiftwidth=4 " Indent by 4 spaces when auto-indenting
+set tabstop=4 " Show existing tab with 4 spaces width
+filetype indent on " Enable indenting for files
+set autoindent " Enable auto indenting
+set nobackup " Disable backup files
+set noswapfile " Disable swp backup files
+set laststatus=2 "show status line
+set statusline=%F%m%r%h%w%=(%{&ff}/%Y)\ (line\ %l\/%L,\ col\ %c)\
+set wildmenu " Display command line's tab complete options as a menu.
+set pastetoggle=<F3>
+set number relativenumber
+set lazyredraw
+set clipboard=unnamedplus
+let mapleader = " "
+set paste
+
+"map <C-N> :w \| call system('cd "$HOME/.node-red"; npm install node-red-contrib-spawn-service/; pm2 restart node-red')<CR>
+
+"* shortcuts
+
+map <C-P> "pdggdG"pP
+"autocmd TerminalOpen * set nonu
+"nnoremap <F1> :silent call Selection()<CR>
+
+"* handleText
+function HandleText(channel) abort
+  let text = []
+  while ch_status(a:channel, {'part': 'out'}) == 'buffered'
+    let text += [ch_read(a:channel)]
+  endwhile
+  let text = join(text, '\n')
+  " … imagine more vimscript functions that use `text`, below …
+endfunction
+
+"* executeOnTerminal
+function! ExecuteOnTerminal(type) range
+	let extension = expand('%:e')
+	" criar variavel de forma a retornar o tipo da extensao
+	if (&ft=='mc')
+		if a:type == "V"
+			:'<,'>w! /tmp/tmpfile
+			:call system('gnome-terminal -- bash -c "mc $(cat /tmp/tmpfile)"')
+			:call system('xdotool key F11')
+		endif
+	elseif (extension =~ "code")
+		if a:type == "V"
+			:'<,'>w! /tmp/tmpfile
+			:call system('eval code "$(cat /tmp/tmpfile)"')
+			":call system('xdotool key F11')
+		endif
+	elseif (&ft=='vim')
+		:'<,'>w! /tmp/tmpfile
+		:call system('cat /tmp/tmpfile | vi -')
+	elseif (&ft=='html')
+		if a:type == "V"
+			:'<,'>w! /tmp/index.js
+		else
+			:w! /tmp/index.html
+			:e /tmp/index.html
+		endif
+		let job = job_start(['sh', '-c', 'cd /tmp && browser-sync start --server --files /tmp/index.html'], #{close_cb: 'HandleText'})
+	elseif ((&ft=='javascript') || (&ft=='javascriptreact')) " check if filetype is javascript
+		if a:type == "V"
+			:'<,'>w! /tmp/file.js
+			let language = system('file="/tmp/file.js"; flag="false"; while read line; do if [[ "$line" =~ ^import.*$ ]];then flag="true"; fi; done < $file; if [[ "$flag" = "true" ]];then echo "mjs"; else echo "js"; fi')
+			if (language =~ "mjs")
+				:'<,'>w! /tmp/file.mjs
+				:vert botright terminal node /tmp/file.mjs
+			else
+				:'<,'>w! /tmp/file.js
+				:vert botright terminal node /tmp/file.js
+			endif
+		else
+			:w! /tmp/file.js
+			let language = system('file="/tmp/file.js"; flag="false"; while read line; do if [[ "$line" =~ ^import.*$ ]];then flag="true"; fi; done < $file; if [[ "$flag" = "true" ]];then echo "mjs"; else echo "js"; fi')
+			if (language =~ "mjs")
+				:w! /tmp/file.mjs
+				:vert botright terminal node /tmp/file.mjs
+			else
+				:w! /tmp/file.js
+				:vert botright terminal node /tmp/file.js
+			endif
+		endif
+	elseif (&ft=='bash' || &ft=='sh')
+		if a:type == "V"
+			"call system('notify-send bash (range)')
+			:vert botright '<,'> %terminal bash
+		else
+			"call system('notify-send bash')
+			:vert botright %terminal bash
+		endif
+	elseif (&ft=='zsh')
+		if a:type == "V"
+			:vert botright '<,'> %terminal zsh
+		else
+			:vert botright %terminal zsh
+		endif
+	elseif (&ft=='python')
+		if a:type == "V"
+			"call system('notify-send py (range)')
+			:vert botright '<,'> %terminal python3
+		else
+			"call system('notify-send py')
+			:vert botright %terminal python3
+		endif
+	elseif (&ft=='awk')
+		if a:type == "V"
+			'<,'>w! /tmp/file.awk
+		else
+			:w! /tmp/file.awk
+		endif
+		:vert botright terminal awk -f /tmp/file.awk /home/rafael/sample
+		":vert botright terminal awk -F ',' -v sqsqsqsq="'" -f /tmp/file.awk /home/rafael/sample /home/rafael/sample2
+	elseif (&ft=='markdown')
+		if a:type != "V"
+      "":! retext %
+      let job = job_start(['sh', '-c', 'retext ' . expand('%:p') ])
+			call system('sleep 1.5; xdotool key F11')
+		endif
+	endif
+endfunction
+
+vnoremap <leader>cc :call ExecuteOnTerminal("V")<CR>
+nnoremap <leader>cc :call ExecuteOnTerminal("I")<CR>
+"* returnCode
+function! ReturnCode()
+	if (&ft=='javascript' || &ft=='python' || &ft=='sh')
+		:normal u`lzz
+		:echo "going back"
+	endif
+endfunction
+
+nnoremap <F4> :silent call ReturnCode()<CR>
+
+"* writeTemp
+function! WriteTemp()
+	:set modifiable
+"	:w! /tmp/file
+"	:e /tmp/file
+"	let code = system('cat /tmp/file | jq -e . >/dev/null 2>&1  ; echo ${PIPESTATUS[1]}')
+"	if (code =~ "0")
+"		:w! /tmp/file.json
+"		:e /tmp/file.json
+"		:%! jq ''
+"	endif
+endfunction
+
+nnoremap <C-T> :call WriteTemp()<CR>
+
+"* folding
+function! MyFoldExpr()
+  " Try to extract the comment character from 'commentstring'
+  let commentChar = substitute(&commentstring, '%s.*', '', '')
+
+  " Fallback for specific filesyntax
+  if &syntax == 'python' || &syntax == 'sh' || &syntax == 'yaml' || &syntax == 'nginx' || &syntax == 'dockerfile' || &syntax == 'apache' || &syntax == 'conf'
+    let commentChar = '#'
+  elseif &syntax == 'javascript'
+    let commentChar = '//'
+  elseif &syntax == 'lua'
+    let commentChar = '--'
+  elseif &syntax == 'lisp'
+    let commentChar = ';;'
+  endif
+
+  " Build the fold start pattern
+  let spacePattern = '"^\\s*"'
+  let escapedCommentChar = '"' . escape(commentChar, '\\') . '"'
+  let asteriskPattern = '"\\*\\+"'
+  let foldStartPattern = spacePattern . '.' . escapedCommentChar . '.' . asteriskPattern
+
+  " Check if the current line starts with the fold pattern
+  if getline(v:lnum) =~ eval(foldStartPattern)
+    return '>1'
+  " Check if the next line also starts with the same pattern, end the current fold
+  elseif getline(v:lnum + 1) =~ eval(foldStartPattern)
+    return '<1'
+  else
+    " Continue the fold for other lines
+    return '='
+  endif
+endfunction
+
+set foldmethod=expr
+set foldexpr=MyFoldExpr()
+set foldlevelstart=1
+set foldenable
+
+function! UpdateAndFold()
+  normal! zx
+  normal! zM
+endfunction
+
+function! UpdateAndUnfold()
+  normal! zx
+  normal! zR
+endfunction
+
+function! KillBuffer()
+  bd!
+endfunction
+
+function! ToggleFold()
+    " Get the current line number
+    let currentLine = line('.')
+
+    " Check if the current line is within a closed fold
+    if foldclosed(currentLine) != -1 && foldclosedend(currentLine) != -1
+        " If in a closed fold, open the fold at the cursor
+        normal! zo
+    else
+        " If not in a closed fold, close the fold at the cursor
+        normal! zc
+    endif
+endfunction
+
+nnoremap zfa :call UpdateAndFold()<CR>
+nnoremap zfu :call UpdateAndUnfold()<CR>
+nnoremap <leader>bk :call KillBuffer()<CR>
+nnoremap <Tab> :call ToggleFold()<CR>
+
+"* narrow
+let g:originalFoldRange = {}
+function! OpenFoldInNewBuffer()
+  normal! zx
+  normal! zM
+  let foldStart = foldclosed('.')
+  let foldEnd = foldclosedend('.')
+
+  if foldStart == -1 || foldEnd == -1
+    echo "Not in a fold"
+    return
+  endif
+  set hidden
+
+
+  " Store original buffer number and fold range
+  let g:originalFoldRange = {'bufnr': bufnr('%'), 'start': foldStart, 'end': foldEnd}
+
+  let currentFileType = &filetype
+  silent execute foldStart . ',' . foldEnd . 'yank'
+  enew
+  execute 'setlocal filetype=' . currentFileType
+  0put
+  normal! Gddgg
+  if line('$') > 1
+    execute '1delete'
+  endif
+endfunction
+
+nnoremap zn :call OpenFoldInNewBuffer()<CR>
+
+"* widen
+function! ReplaceFoldContent()
+  " Check if 'g:originalFoldRange' exists and if the current buffer has no associated file
+  if !exists('g:originalFoldRange') || bufname('%') != ''
+    echo "This command can only be executed in a temporary buffer opened by zn"
+    return
+  endif
+
+  " Enable hiding buffers with unsaved changes
+  set hidden
+
+  " Store the edited content from the temporary buffer
+  let editedContent = getline(1, '$')
+
+  " Switch to the original buffer
+  execute 'buffer' . g:originalFoldRange.bufnr
+
+  " Delete the old content inside the fold, excluding the fold start line
+  if g:originalFoldRange.start < g:originalFoldRange.end
+    execute (g:originalFoldRange.start + 1) . ',' . g:originalFoldRange.end . 'delete'
+  endif
+
+  " Insert the new content after the fold start line
+  call append(g:originalFoldRange.start, editedContent)
+
+  " Close the temporary buffer
+  let tempBufferNr = bufnr('#')
+  execute 'bdelete! ' . tempBufferNr
+
+  " Move cursor to the start of the fold that was edited
+  execute g:originalFoldRange.start
+
+  " Reapply folding and open the current fold if it exists
+  normal! zx
+  normal! zM
+  normal! zo
+  set nohidden
+endfunction
+
+nnoremap zu :call ReplaceFoldContent()<CR>
+
+"* toggleComments
+function! ToggleComments() range
+  " Define the comment character based on filetype
+  let commentChar = substitute(&commentstring, '%s.*', '', '')
+
+  " Fallback for specific file syntax
+  if &syntax == 'python' || &syntax == 'sh' || &syntax == 'yaml'
+    let commentChar = '#'
+  elseif &syntax == 'javascript'
+    let commentChar = '//'
+  elseif &syntax == 'vim'
+    let commentChar = '"'
+  endif
+
+  " Add a space for readability, if needed
+  let commentChar .= (commentChar =~ '\S$' ? ' ' : '')
+
+  " Escape the comment character for regex
+  let escapedCommentChar = escape(commentChar, '\')
+
+  " Iterate over the selected lines
+  let startLine = line("'<")
+  let endLine = line("'>")
+  for i in range(startLine, endLine)
+    let line = getline(i)
+
+    " Build a regex pattern to check if the line is already commented
+    let commentPattern = '"^\s*' . escapedCommentChar . '"'
+
+    " Check if the line is already commented
+    if line =~ eval(commentPattern)
+      " Uncomment the line
+      let newLine = substitute(line, eval(commentPattern), '', '')
+    else
+      " Comment the line
+      let newLine = commentChar . line
+    endif
+
+    " Replace the line with the new content
+    call setline(i, newLine)
+  endfor
+endfunction
+
+" Map the function to Tab key in visual mode
+vnoremap <Tab> :call ToggleComments()<CR>
+nnoremap <leader>a :Explore<CR>
