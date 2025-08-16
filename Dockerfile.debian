@@ -28,7 +28,7 @@ RUN groupadd -g ${NB_GID} ${NB_USER} \
 
 WORKDIR /home/${NB_USER}/work
 
-# Python em venv (foge do PEP 668 sem quebrar sistema)
+# Python em venv (foge do PEP 668) + Jupyter
 RUN python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH
 
@@ -64,21 +64,48 @@ RUN go install github.com/gopherdata/gophernotes@latest && \
     printf '{\n  "argv": ["/usr/local/bin/gophernotes", "{connection_file}"],\n  "display_name": "Go (gophernotes)",\n  "language": "go",\n  "codemirror_mode": "go"\n}\n' \
       > /usr/local/share/jupyter/kernels/gophernotes/kernel.json
 
+# ===================== C++17 via xeus-cling (micromamba) ======================
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+RUN apt-get update && apt-get install -y --no-install-recommends bzip2 && rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /opt/conda && \
+    curl -L https://micro.mamba.pm/api/micromamba/linux-64/latest \
+      | tar -xj -C /usr/local/bin bin/micromamba --strip-components=1 && \
+    /usr/local/bin/micromamba install -y -r /opt/conda -n base -c conda-forge xeus-cling && \
+    /usr/local/bin/micromamba clean -a -y
+
+# Copia APENAS o kernelspec de C++17 e ajusta kernel.json para usar /opt/conda/bin/xcpp
+RUN set -eux; \
+    ksroot="/opt/conda/share/jupyter/kernels"; \
+    dest="/usr/local/share/jupyter/kernels/xcpp17"; \
+    mkdir -p "${dest}"; \
+    # tenta achar a pasta de cpp17 com nomes comuns
+    for name in xcpp17 xeus-cling-cpp17 cpp17; do \
+      if [ -d "${ksroot}/${name}" ]; then src="${ksroot}/${name}"; break; fi; \
+    done; \
+    cp -r "${src}/"* "${dest}/"; \
+    python3 - <<'PY'
+from pathlib import Path
+import json
+p = Path("/usr/local/share/jupyter/kernels/xcpp17/kernel.json")
+j = json.loads(p.read_text())
+# chama o binário real do xeus-cling (não existe xcpp17, o correto é xcpp)
+j["argv"] = ["/opt/conda/bin/xcpp", "-f", "{connection_file}"]
+env = j.get("env", {})
+env.setdefault("LD_LIBRARY_PATH", "/opt/conda/lib")
+j["env"] = env
+p.write_text(json.dumps(j, indent=2))
+PY
+
 # Tema escuro padrão para o usuário
 RUN mkdir -p /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
     printf '{ "theme": "JupyterLab Dark" }\n' \
       > /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
     chown -R ${NB_UID}:${NB_GID} /home/${NB_USER}/.jupyter
 
-# (opcional) seu vimrc
-# COPY conf/vimrc /etc/vim/vimrc
-
-# Script de start: corrige permissões do bind mount e troca para jovyan
+# Script de start: corrige permissões do bind e troca para jovyan
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-# Rodamos como root para poder consertar permissões e depois dar drop
 ENV SHELL=/bin/bash
 ENTRYPOINT ["/usr/bin/tini","-g","--","/usr/local/bin/start.sh"]
 CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--no-browser","--ServerApp.token=","--ServerApp.password="]
-
