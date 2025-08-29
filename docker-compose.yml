@@ -10,10 +10,7 @@ services:
     ports:
       - "127.0.0.1:8000:8888"
     volumes:
-      - ./notebook:/home/jovyan/work
+      - ./notebook:/root/work
     restart: unless-stopped
     environment:
       - TZ=UTC
-      # (opcional) se quiser forçar UID/GID diferentes do padrão:
-      # - NB_UID=1000
-      # - NB_GID=1000

@@ -1,9 +1,6 @@
 FROM debian:12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-ARG NB_USER=jovyan
-ARG NB_UID=1000
-ARG NB_GID=1000
 
 # SO + ferramentas mínimas
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,21 +9,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ make \
     openjdk-17-jdk-headless \
     libpq-dev postgresql-client \
-    golang-go \
- && rm -rf /var/lib/apt/lists/*
+    golang-go
+ #&& rm -rf /var/lib/apt/lists/*
 
 # Node LTS para tslab
 RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
  && apt-get update && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/*
 
-# Usuário jovyan (UID/GID=1000:1000)
-RUN groupadd -g ${NB_GID} ${NB_USER} \
- && useradd -m -s /bin/bash -u ${NB_UID} -g ${NB_GID} ${NB_USER} \
- && mkdir -p /home/${NB_USER}/work \
- && chown -R ${NB_UID}:${NB_GID} /home/${NB_USER}
-
-WORKDIR /home/${NB_USER}/work
+WORKDIR /root/work
 
 # Python em venv (foge do PEP 668) + Jupyter
 RUN python3 -m venv /opt/venv
@@ -97,15 +88,25 @@ p.write_text(json.dumps(j, indent=2))
 PY
 
 # Tema escuro padrão para o usuário
-RUN mkdir -p /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
+RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && \
     printf '{ "theme": "JupyterLab Dark" }\n' \
-      > /home/${NB_USER}/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings && \
-    chown -R ${NB_UID}:${NB_GID} /home/${NB_USER}/.jupyter
+      > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings
 
-# Script de start: corrige permissões do bind e troca para jovyan
+# Script de start: corrige permissões do bind e troca
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
+# --- Python venv isolated from Debian's system Python (PEP 668 safe)
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/python -m ensurepip --upgrade && \
+    /opt/venv/bin/python -m pip install --upgrade --no-cache-dir pip setuptools wheel
+
+# Make venv tools unambiguous everywhere
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN ln -sf /opt/venv/bin/python /usr/local/bin/python && \
+    ln -sf /opt/venv/bin/pip    /usr/local/bin/pip
+
 ENV SHELL=/bin/bash
 ENTRYPOINT ["/usr/bin/tini","-g","--","/usr/local/bin/start.sh"]
-CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--no-browser","--ServerApp.token=","--ServerApp.password="]
+CMD ["jupyter","lab","--ip=0.0.0.0","--port=8888","--no-browser","--ServerApp.token=","--ServerApp.password=", "--allow-root"]
