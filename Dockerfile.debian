@@ -92,6 +92,10 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
     printf '{ "theme": "JupyterLab Dark" }\n' \
       > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings
 
+# Package management script
+COPY scripts/pkg /usr/local/bin/pkg
+RUN chmod +x /usr/local/bin/pkg
+
 # Script de start: corrige permissões do bind e troca
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
