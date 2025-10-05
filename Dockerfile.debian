@@ -43,6 +43,10 @@ RUN python -m bash_kernel.install --sys-prefix && \
     pip install --no-cache-dir --no-build-isolation --no-deps postgres_kernel && \
     python -m postgres_kernel install --sys-prefix
 
+# Ansible kernel
+RUN pip install --no-cache-dir ansible-kernel && \
+    python -m ansible_kernel.install --sys-prefix
+
 # JS/TS via tslab (global)
 RUN npm install -g tslab && \
     JUPYTER_DATA_DIR=/usr/local/share/jupyter tslab install --python=/opt/venv/bin/python
