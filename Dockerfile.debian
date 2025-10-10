@@ -99,8 +99,8 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
 # ===================== Elyra - AI-centric JupyterLab extensions ======================
 # Install Elyra core (includes local pipeline runtime, visual editor, code snippets)
 # Use elyra[kfp] or elyra[airflow] if you need remote pipeline execution
-RUN pip install --no-cache-dir elyra && \
-    jupyter server extension enable elyra
+#RUN pip install --no-cache-dir elyra && \
+    #jupyter server extension enable elyra
 
 # ===================== Jupyter Scheduler - Schedule notebooks from UI ======================
 # Provides GUI for scheduling notebooks without needing Airflow/Kubernetes
