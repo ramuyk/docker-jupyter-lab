@@ -14,4 +14,4 @@ services:
       - ./jupyter-data:/root/.local/share/jupyter
     restart: unless-stopped
     environment:
-      - TZ=UTC
+      - TZ=America/Sao_Paulo
