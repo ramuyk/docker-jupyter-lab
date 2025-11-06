@@ -107,6 +107,11 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
 RUN pip install --no-cache-dir jupyter-scheduler && \
     jupyter server extension enable jupyter_scheduler
 
+# ===================== JupyterLab SOS - Polyglot notebook environment ======================
+# SOS (Script of Scripts) enables multi-kernel notebooks and workflow system
+RUN pip install --no-cache-dir sos sos-notebook jupyterlab-sos && \
+    python -m sos_notebook.install
+
 # Package management script
 COPY scripts/pkg /usr/local/bin/pkg
 RUN chmod +x /usr/local/bin/pkg
