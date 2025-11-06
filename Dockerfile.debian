@@ -43,8 +43,8 @@ RUN python -m bash_kernel.install --sys-prefix && \
     pip install --no-cache-dir --no-build-isolation --no-deps postgres_kernel && \
     python -m postgres_kernel install --sys-prefix
 
-# Ansible kernel
-RUN pip install --no-cache-dir ansible-kernel && \
+# Ansible kernel - use --no-build-isolation to ensure jupyter_client is available during build
+RUN pip install --no-cache-dir --no-build-isolation ansible-kernel && \
     python -m ansible_kernel.install --sys-prefix
 
 # JS/TS via tslab (global)
