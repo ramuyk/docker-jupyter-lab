@@ -15,3 +15,15 @@ services:
     restart: unless-stopped
     environment:
       - TZ=America/Sao_Paulo
+    networks:
+      - jupyter_network
+
+networks:
+  jupyter_network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.23.0.0/28
+          gateway: 172.23.0.1
+        - subnet: fd02::/120
+          gateway: fd02::1
