@@ -96,12 +96,6 @@ RUN mkdir -p /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension && 
     printf '{ "theme": "JupyterLab Dark" }\n' \
       > /root/.jupyter/lab/user-settings/@jupyterlab/apputils-extension/themes.jupyterlab-settings
 
-# ===================== Elyra - AI-centric JupyterLab extensions ======================
-# Install Elyra core (includes local pipeline runtime, visual editor, code snippets)
-# Use elyra[kfp] or elyra[airflow] if you need remote pipeline execution
-#RUN pip install --no-cache-dir elyra && \
-    #jupyter server extension enable elyra
-
 # ===================== Jupyter Scheduler - Schedule notebooks from UI ======================
 # Provides GUI for scheduling notebooks without needing Airflow/Kubernetes
 RUN pip install --no-cache-dir jupyter-scheduler && \
@@ -111,6 +105,17 @@ RUN pip install --no-cache-dir jupyter-scheduler && \
 # SOS (Script of Scripts) enables multi-kernel notebooks and workflow system
 RUN pip install --no-cache-dir sos sos-notebook jupyterlab-sos && \
     python -m sos_notebook.install
+
+# ===================== JupyterLab Git - Git extension for JupyterLab ======================
+# Provides Git integration directly in JupyterLab UI
+RUN pip install --no-cache-dir jupyterlab-git && \
+    jupyter lab build --dev-build=False --minimize=True
+
+# ===================== Elyra - AI-centric JupyterLab extensions ======================
+# Install Elyra core (includes local pipeline runtime, visual editor, code snippets)
+# Use elyra[kfp] or elyra[airflow] if you need remote pipeline execution
+#RUN pip install --no-cache-dir elyra && \
+    #jupyter server extension enable elyra
 
 # Package management script
 COPY scripts/pkg /usr/local/bin/pkg
